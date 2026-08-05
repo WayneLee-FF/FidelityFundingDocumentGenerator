@@ -361,9 +361,10 @@ if submit_button:
             clean_file_date = agreement_date.strftime("%Y%m%d")
             rps_code = TEMPLATE_CONFIG["RPS_CLASSES"][selected_rps]["class_code"]
 
-            fn_sub_base = f"{clean_file_client_name} 1. FF {rps_code} SubscriptionAgreement {clean_file_date}"
-            fn_deed_base = f"{clean_file_client_name} 2. FF Deed of Adherence {clean_file_date}"
-            fn_decl_base = f"{clean_file_client_name} 3. FF Declaration Form (Sophisticated Investor)"
+            # Output File Naming Patterns (Added brackets)
+            fn_sub_base = f"[{clean_file_client_name}] 1. FF {rps_code} SubscriptionAgreement {clean_file_date}"
+            fn_deed_base = f"[{clean_file_client_name}] 2. FF Deed of Adherence {clean_file_date}"
+            fn_decl_base = f"[{clean_file_client_name}] 3. FF Declaration Form (Sophisticated Investor)"
 
             try:
                 # 1. Fetch Google Doc templates
@@ -397,7 +398,7 @@ if submit_button:
                 st.download_button(
                     label="📦 Download All PDFs (ZIP)",
                     data=zip_buffer.getvalue(),
-                    file_name=f"{clean_file_client_name}_Documents.zip",
+                    file_name=f"[{clean_file_client_name}]_Documents.zip",
                     mime="application/zip",
                     type="primary"
                 )
