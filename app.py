@@ -95,34 +95,47 @@ def fetch_google_doc_bytes(url: str) -> bytes:
     return response.content
 
 def replace_placeholders_in_paragraph(paragraph, replacements: dict):
-    """Replace placeholder keys in paragraph while preserving text runs."""
+    """Replace placeholder keys in paragraph while preserving text runs and formatting."""
     for key, value in replacements.items():
         if key in paragraph.text:
             for run in paragraph.runs:
                 if key in run.text:
                     run.text = run.text.replace(key, value)
-            
-            if key in paragraph.text:
-                full_text = paragraph.text.replace(key, value)
-                for i, run in enumerate(paragraph.runs):
-                    if i == 0:
-                        run.text = full_text
-                    else:
-                        run.text = ""
 
 def process_docx_bytes(file_bytes: bytes, replacements: dict) -> bytes:
-    """Load DOCX bytes, replace placeholders, and return modified DOCX bytes."""
+    """Load DOCX bytes, replace placeholders globally, and return modified DOCX bytes."""
     doc_io = io.BytesIO(file_bytes)
     doc = Document(doc_io)
 
+    # 1. Process standard paragraphs
     for p in doc.paragraphs:
         replace_placeholders_in_paragraph(p, replacements)
 
+    # 2. Process tables
     for table in doc.tables:
         for row in table.rows:
             for cell in row.cells:
                 for p in cell.paragraphs:
                     replace_placeholders_in_paragraph(p, replacements)
+                    
+    # 3. Process headers and footers (Important for templates)
+    for section in doc.sections:
+        if section.header:
+            for p in section.header.paragraphs:
+                replace_placeholders_in_paragraph(p, replacements)
+            for table in section.header.tables:
+                for row in table.rows:
+                    for cell in row.cells:
+                        for p in cell.paragraphs:
+                            replace_placeholders_in_paragraph(p, replacements)
+        if section.footer:
+            for p in section.footer.paragraphs:
+                replace_placeholders_in_paragraph(p, replacements)
+            for table in section.footer.tables:
+                for row in table.rows:
+                    for cell in row.cells:
+                        for p in cell.paragraphs:
+                            replace_placeholders_in_paragraph(p, replacements)
 
     output_io = io.BytesIO()
     doc.save(output_io)
@@ -150,7 +163,7 @@ def convert_docx_to_pdf(docx_bytes: bytes) -> bytes:
                 with open(output_pdf_path, "rb") as f:
                     return f.read()
         except Exception as e:
-            st.warning(f"PDF conversion warning: {e}. Falling back to DOCX format.")
+            st.warning(f"PDF conversion warning: {e}")
     return None
 
 # ==========================================
@@ -174,7 +187,12 @@ with st.form("doc_generation_form"):
         
     with col2:
         selected_rps = st.selectbox("Select RPS Class", list(TEMPLATE_CONFIG["RPS_CLASSES"].keys()))
-        client_dob = st.date_input("Date of Birth", value=datetime.date(1990, 1, 1))
+        client_dob = st.date_input(
+            "Date of Birth", 
+            value=datetime.date(1990, 1, 1), 
+            min_value=datetime.date(1900, 1, 1), 
+            max_value=datetime.date.today()
+        )
         client_nationality = st.text_input("Nationality", value="")
         client_occupation = st.text_input("Occupation", value="")
         investment_amt = st.text_input("Investment Amount (RM)", value="")
@@ -214,7 +232,7 @@ with st.form("doc_generation_form"):
                 nom_data[f"<<NOM{i}_EMAIL>>"] = st.text_input(f"Nominee {i} Email", key=f"n_email_{i}")
                 nom_data[f"<<NOM{i}_PERCENTAGE>>"] = st.text_input(f"Nominee {i} Percentage (%)", key=f"n_pct_{i}")
 
-    submit_button = st.form_submit_button("Generate Documents & PDF")
+    submit_button = st.form_submit_button("Generate PDF Documents")
 
 # ==========================================
 # VALIDATION & PROCESSING
@@ -228,10 +246,9 @@ if submit_button:
         errors.append("Please enter the Client Name before proceeding.")
 
     # 2. Client Email Validation
-    if client_email.strip():
-        email_regex = r"^[\w\.-]+@[\w\.-]+\.\w+$"
-        if not re.match(email_regex, client_email.strip()):
-            errors.append("Invalid Client Email format.")
+    email_regex = r"^[\w\.-]+@[\w\.-]+\.\w+$"
+    if client_email.strip() and not re.match(email_regex, client_email.strip()):
+        errors.append("Invalid Client Email format.")
 
     # 3. Investment Amount Validation (Numbers only)
     clean_inv_amt = investment_amt.strip().replace(",", "")
@@ -249,6 +266,10 @@ if submit_button:
         n_addr = nom_data.get(f"<<NOM{i}_ADDRESS>>", "").strip()
         n_email = nom_data.get(f"<<NOM{i}_EMAIL>>", "").strip()
         pct_val_str = nom_data.get(f"<<NOM{i}_PERCENTAGE>>", "").strip()
+
+        # Nominee Email Check
+        if n_email and not re.match(email_regex, n_email):
+            errors.append(f"Nominee {i} Email format is invalid.")
 
         # Check if ANY field for this nominee has been filled
         is_nominee_filled = any([n_name, n_nric, n_rel, n_addr, n_email, pct_val_str])
@@ -280,19 +301,13 @@ if submit_button:
         with st.spinner("Fetching templates and generating PDFs..."):
             
             # --- Text Formatting Rules ---
-            # 1. Names: ALWAYS ALL UPPER CASE
             formatted_client_name = client_name.strip().upper()
             formatted_witness_name = witness_name.strip().upper()
-
-            # 2. Address & Occupation: ALWAYS Title Case
             formatted_client_address = client_address.strip().title() if client_address.strip() else ""
             formatted_client_occupation = client_occupation.strip().title() if client_occupation.strip() else ""
-
-            # 3. Dates: DD MMM YYYY (e.g., 05 Aug 2026)
             formatted_agreement_date = agreement_date.strftime("%d %b %Y")
             formatted_client_dob = client_dob.strftime("%d %b %Y") if client_dob else ""
 
-            # 4. Investment Amount: Comma every 3 digits, ends with .00 (e.g., 100,000.00)
             if clean_inv_amt:
                 try:
                     formatted_investment_amt = f"{float(clean_inv_amt):,.2f}"
@@ -301,7 +316,6 @@ if submit_button:
             else:
                 formatted_investment_amt = ""
 
-            # 5. Nominee Formats (Names -> UPPERCASE, Relationship & Address -> Title Case)
             formatted_nom_data = {}
             for i in range(1, 5):
                 n_name = nom_data.get(f"<<NOM{i}_NAME>>", "").strip()
@@ -320,7 +334,6 @@ if submit_button:
 
             rps_sub_url = TEMPLATE_CONFIG["RPS_CLASSES"][selected_rps]["doc_url"]
 
-            # Map input fields to placeholders
             raw_replacements = {
                 "<<CLIENT_NAME>>": formatted_client_name,
                 "<<CLIENT_NRIC>>": client_nric,
@@ -342,14 +355,12 @@ if submit_button:
                 **formatted_nom_data
             }
 
-            # Replace blank fields with two spaces "  "
             replacements = {k: (v.strip() if v and str(v).strip() else "  ") for k, v in raw_replacements.items()}
 
             clean_file_client_name = client_name.strip()
             clean_file_date = agreement_date.strftime("%Y%m%d")
             rps_code = TEMPLATE_CONFIG["RPS_CLASSES"][selected_rps]["class_code"]
 
-            # Output File Naming Patterns
             fn_sub_base = f"{clean_file_client_name} 1. FF {rps_code} SubscriptionAgreement {clean_file_date}"
             fn_deed_base = f"{clean_file_client_name} 2. FF Deed of Adherence {clean_file_date}"
             fn_decl_base = f"{clean_file_client_name} 3. FF Declaration Form (Sophisticated Investor)"
@@ -370,22 +381,21 @@ if submit_button:
                 deed_pdf = convert_docx_to_pdf(deed_docx)
                 decl_pdf = convert_docx_to_pdf(decl_docx)
 
-                st.success("✅ Documents generated successfully!")
+                st.success("✅ PDF Documents generated successfully!")
 
-                # Prepare ZIP download package
+                # Prepare ZIP download package (PDFs ONLY)
                 zip_buffer = io.BytesIO()
                 with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
                     if sub_pdf:
                         zip_file.writestr(f"{fn_sub_base}.pdf", sub_pdf)
                         zip_file.writestr(f"{fn_deed_base}.pdf", deed_pdf)
                         zip_file.writestr(f"{fn_decl_base}.pdf", decl_pdf)
-                    zip_file.writestr(f"{fn_sub_base}.docx", sub_docx)
-                    zip_file.writestr(f"{fn_deed_base}.docx", deed_docx)
-                    zip_file.writestr(f"{fn_decl_base}.docx", decl_docx)
+                    else:
+                        st.error("Failed to generate PDFs. Please check system dependencies.")
 
                 # Single Download Button for ZIP
                 st.download_button(
-                    label="📦 Download All Documents (ZIP)",
+                    label="📦 Download All PDFs (ZIP)",
                     data=zip_buffer.getvalue(),
                     file_name=f"{clean_file_client_name}_Documents.zip",
                     mime="application/zip",
@@ -393,7 +403,7 @@ if submit_button:
                 )
 
                 st.markdown("---")
-                st.subheader("📥 Individual File Downloads")
+                st.subheader("📥 Individual PDF Downloads")
 
                 col_d1, col_d2, col_d3 = st.columns(3)
 
@@ -401,19 +411,16 @@ if submit_button:
                     st.write("**1. Subscription Agreement**")
                     if sub_pdf:
                         st.download_button("Download PDF", sub_pdf, f"{fn_sub_base}.pdf", "application/pdf")
-                    st.download_button("Download DOCX", sub_docx, f"{fn_sub_base}.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
 
                 with col_d2:
                     st.write("**2. Deed of Adherence**")
                     if deed_pdf:
                         st.download_button("Download PDF", deed_pdf, f"{fn_deed_base}.pdf", "application/pdf")
-                    st.download_button("Download DOCX", deed_docx, f"{fn_deed_base}.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
 
                 with col_d3:
                     st.write("**3. Declaration Form**")
                     if decl_pdf:
                         st.download_button("Download PDF", decl_pdf, f"{fn_decl_base}.pdf", "application/pdf")
-                    st.download_button("Download DOCX", decl_docx, f"{fn_decl_base}.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
 
             except Exception as e:
                 st.error(f"Error processing Google Docs: {e}")
