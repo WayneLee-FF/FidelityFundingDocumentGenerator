@@ -1,0 +1,295 @@
+import io
+import os
+import re
+import zipfile
+import subprocess
+import tempfile
+import requests
+import streamlit as st
+from docx import Document
+
+# ==========================================
+# PAGE CONFIGURATION
+# ==========================================
+st.set_page_config(
+    page_title="Document Generator | Fidelity Funding",
+    page_icon="📄",
+    layout="wide"
+)
+
+# ==========================================
+# EASY CONFIGURATION / LINK MANAGEMENT
+# ==========================================
+# Modify Google Doc links here if they change in the future.
+TEMPLATE_CONFIG = {
+    "RPS_CLASSES": {
+        "RPS-Y | 1yr | 10.0%": {
+            "class_code": "RPS-Y",
+            "doc_url": "https://docs.google.com/document/d/1u5_-1qhJOk_6HfRILFRLTBAxL3UmE-p1/"
+        },
+        "RPS-Z | 1yr | 6.0%": {
+            "class_code": "RPS-Z",
+            "doc_url": "https://docs.google.com/document/d/1u5_-1qhJOk_6HfRILFRLTBAxL3UmE-p1/"
+        }
+    },
+    "DEED_OF_ADHERENCE": "https://docs.google.com/document/d/1WhyRxt6nOaReWplabFUVUXgfgZI_zWtS/",
+    "DECLARATION_FORM": "https://docs.google.com/document/d/1NBmaPDk5RwJZArVO4OUxWDI33q8Ox_U4/"
+}
+
+# ==========================================
+# HELPER FUNCTIONS
+# ==========================================
+
+def extract_doc_id(url: str) -> str:
+    """Extract Google Doc ID from full URL."""
+    match = re.search(r"/d/([a-zA-Z0-9-_]+)", url)
+    return match.group(1) if match else ""
+
+def fetch_google_doc_bytes(url: str) -> bytes:
+    """Download Google Doc directly as DOCX bytes."""
+    doc_id = extract_doc_id(url)
+    export_url = f"https://docs.google.com/document/d/{doc_id}/export?format=docx"
+    response = requests.get(export_url)
+    response.raise_for_status()
+    return response.content
+
+def replace_placeholders_in_paragraph(paragraph, replacements: dict):
+    """Replace placeholder keys in paragraph while preserving text runs."""
+    for key, value in replacements.items():
+        if key in paragraph.text:
+            # Replace at individual run level if key is contained in a single run
+            for run in paragraph.runs:
+                if key in run.text:
+                    run.text = run.text.replace(key, value)
+            
+            # If key spans across multiple runs, replace across paragraph text
+            if key in paragraph.text:
+                full_text = paragraph.text.replace(key, value)
+                for i, run in enumerate(paragraph.runs):
+                    if i == 0:
+                        run.text = full_text
+                    else:
+                        run.text = ""
+
+def process_docx_bytes(file_bytes: bytes, replacements: dict) -> bytes:
+    """Load DOCX bytes, replace placeholders, and return modified DOCX bytes."""
+    doc_io = io.BytesIO(file_bytes)
+    doc = Document(doc_io)
+
+    # Process all paragraphs
+    for p in doc.paragraphs:
+        replace_placeholders_in_paragraph(p, replacements)
+
+    # Process all table cells
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                for p in cell.paragraphs:
+                    replace_placeholders_in_paragraph(p, replacements)
+
+    output_io = io.BytesIO()
+    doc.save(output_io)
+    return output_io.getvalue()
+
+def convert_docx_to_pdf(docx_bytes: bytes) -> bytes:
+    """Convert DOCX bytes to PDF bytes using headless LibreOffice."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        input_docx_path = os.path.join(tmpdir, "input.docx")
+        with open(input_docx_path, "wb") as f:
+            f.write(docx_bytes)
+        
+        cmd = [
+            "libreoffice",
+            "--headless",
+            "--convert-to", "pdf",
+            "--outdir", tmpdir,
+            input_docx_path
+        ]
+        
+        try:
+            subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+            output_pdf_path = os.path.join(tmpdir, "input.pdf")
+            if os.path.exists(output_pdf_path):
+                with open(output_pdf_path, "rb") as f:
+                    return f.read()
+        except Exception as e:
+            st.warning(f"PDF conversion warning: {e}. Falling back to DOCX format.")
+    return None
+
+# ==========================================
+# USER INTERFACE
+# ==========================================
+
+st.title("📄 PDF & Document Generator")
+st.markdown("Automated generation of **Subscription Agreements**, **Deed of Adherence**, and **Declaration Forms**.")
+
+# Sidebar for Config Management
+with st.sidebar:
+    st.header("⚙️ Template Link Management")
+    st.info("You can quickly update Google Doc template links below if needed.")
+    
+    selected_rps = st.selectbox("Select RPS Class", list(TEMPLATE_CONFIG["RPS_CLASSES"].keys()))
+    rps_sub_url = st.text_input("Subscription Agreement Link", TEMPLATE_CONFIG["RPS_CLASSES"][selected_rps]["doc_url"])
+    deed_url = st.text_input("Deed of Adherence Link", TEMPLATE_CONFIG["DEED_OF_ADHERENCE"])
+    decl_url = st.text_input("Declaration Form Link", TEMPLATE_CONFIG["DECLARATION_FORM"])
+
+# Main Input Form
+with st.form("doc_generation_form"):
+    st.subheader("1. Client & Investment Details")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        client_name = st.text_input("Client Name (CLIENT_NAME)", value="")
+        client_nric = st.text_input("NRIC / Passport / Reg No (CLIENT_NRIC)", value="")
+        client_email = st.text_input("Client Email (CLIENT_EMAIL)", value="")
+        client_contact = st.text_input("Contact Number (CLIENT_CONTACT)", value="")
+        client_address = st.text_area("Correspondence Address (CLIENT_ADDRESS)", value="")
+        
+    with col2:
+        client_dob = st.text_input("Date of Birth (CLIENT_DOB)", value="")
+        client_nationality = st.text_input("Nationality (CLIENT_NATIONALITY)", value="")
+        client_occupation = st.text_input("Occupation (CLIENT_OCCUPATION)", value="")
+        investment_amt = st.text_input("Investment Amount RM (INVESTMENT_AMT)", value="")
+        agreement_date = st.text_input("Agreement Date (DATE)", value="")
+
+    st.subheader("2. Bank Details")
+    b_col1, b_col2, b_col3 = st.columns(3)
+    with b_col1:
+        bank_name = st.text_input("Bank Name (BANK_NAME)", value="")
+    with b_col2:
+        bank_acc_name = st.text_input("Bank Account Name (BANK_ACC_NAME)", value="")
+    with b_col3:
+        bank_acc_no = st.text_input("Bank Account Number (BANK_ACC_NO)", value="")
+
+    st.subheader("3. Witness / Agent Information")
+    w_col1, w_col2 = st.columns(2)
+    with w_col1:
+        witness_name = st.text_input("Witness Name (WITNESS_NAME)", value="")
+    with w_col2:
+        witness_nric = st.text_input("Witness NRIC (WITNESS_NRIC)", value="")
+
+    st.subheader("4. Nominee Information (Optional)")
+    
+    nom_tabs = st.tabs(["Nominee 1", "Nominee 2", "Nominee 3", "Nominee 4"])
+    nom_data = {}
+    
+    for i, tab in enumerate(nom_tabs, start=1):
+        with tab:
+            n_col1, n_col2 = st.columns(2)
+            with n_col1:
+                nom_data[f"<<NOM{i}_NAME>>"] = st.text_input(f"Nominee {i} Name", key=f"n_name_{i}")
+                nom_data[f"<<NOM{i}_NRIC>>"] = st.text_input(f"Nominee {i} NRIC/Passport", key=f"n_nric_{i}")
+                nom_data[f"<<NOM{i}_RELATIONSHIP>>"] = st.text_input(f"Nominee {i} Relationship", key=f"n_rel_{i}")
+            with n_col2:
+                nom_data[f"<<NOM{i}_ADDRESS>>"] = st.text_area(f"Nominee {i} Address", key=f"n_addr_{i}")
+                nom_data[f"<<NOM{i}_EMAIL>>"] = st.text_input(f"Nominee {i} Email", key=f"n_email_{i}")
+                nom_data[f"<<NOM{i}_PERCENTAGE>>"] = st.text_input(f"Nominee {i} Percentage (%)", key=f"n_pct_{i}")
+
+    submit_button = st.form_submit_button("🔨 Generate Documents & PDF")
+
+# ==========================================
+# PROCESSING & DOWNLOAD GENERATION
+# ==========================================
+
+if submit_button:
+    if not client_name.strip():
+        st.error("Please enter at least the Client Name before proceeding.")
+    else:
+        with st.spinner("Fetching templates and generating PDFs..."):
+            # Map input fields to placeholders
+            raw_replacements = {
+                "<<CLIENT_NAME>>": client_name,
+                "<<CLIENT_NRIC>>": client_nric,
+                "<<CLIENT_EMAIL>>": client_email,
+                "<<CLIENT_CONTACT>>": client_contact,
+                "<<CLIENT_ADDRESS>>": client_address,
+                "<<CLIENT_DOB>>": client_dob,
+                "<<CLIENT_NATIONALITY>>": client_nationality,
+                "<<CLIENT_OCCUPATION>>": client_occupation,
+                "<<INVESTMENT_AMT>>": investment_amt,
+                "<<DATE>>": agreement_date,
+                "<<BANK_NAME>>": bank_name,
+                "<<BANK_ACC_NAME>>": bank_acc_name,
+                "<<BANK_ACC_NO>>": bank_acc_no,
+                "<<WITNESS_NAME>>": witness_name,
+                "<<WITNESS_NRIC>>": witness_nric,
+                "<<RPS-CLASS>>": TEMPLATE_CONFIG["RPS_CLASSES"][selected_rps]["class_code"],
+                **nom_data
+            }
+
+            # If any field is left blank, replace placeholder with two spaces "  "
+            replacements = {k: (v.strip() if v and v.strip() else "  ") for k, v in raw_replacements.items()}
+
+            clean_client_name = client_name.strip()
+            clean_date = agreement_date.strip() if agreement_date.strip() else "DATE"
+            rps_code = TEMPLATE_CONFIG["RPS_CLASSES"][selected_rps]["class_code"]
+
+            # Output File Naming Patterns
+            fn_sub_base = f"{clean_client_name} 1. FF {rps_code} SubscriptionAgreement {clean_date}"
+            fn_deed_base = f"{clean_client_name} 2. FF Deed of Adherence {clean_date}"
+            fn_decl_base = f"{clean_client_name} 3. FF Declaration Form (Sophisticated Investor)"
+
+            try:
+                # 1. Fetch Google Doc templates
+                sub_docx_raw = fetch_google_doc_bytes(rps_sub_url)
+                deed_docx_raw = fetch_google_doc_bytes(deed_url)
+                decl_docx_raw = fetch_google_doc_bytes(decl_url)
+
+                # 2. Populate placeholders
+                sub_docx = process_docx_bytes(sub_docx_raw, replacements)
+                deed_docx = process_docx_bytes(deed_docx_raw, replacements)
+                decl_docx = process_docx_bytes(decl_docx_raw, replacements)
+
+                # 3. Convert to PDF
+                sub_pdf = convert_docx_to_pdf(sub_docx)
+                deed_pdf = convert_docx_to_pdf(deed_docx)
+                decl_pdf = convert_docx_to_pdf(decl_docx)
+
+                st.success("✅ Documents generated successfully!")
+
+                # Prepare ZIP download package
+                zip_buffer = io.BytesIO()
+                with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+                    if sub_pdf:
+                        zip_file.writestr(f"{fn_sub_base}.pdf", sub_pdf)
+                        zip_file.writestr(f"{fn_deed_base}.pdf", deed_pdf)
+                        zip_file.writestr(f"{fn_decl_base}.pdf", decl_pdf)
+                    # Add DOCX versions as well
+                    zip_file.writestr(f"{fn_sub_base}.docx", sub_docx)
+                    zip_file.writestr(f"{fn_deed_base}.docx", deed_docx)
+                    zip_file.writestr(f"{fn_decl_base}.docx", decl_docx)
+
+                # Single Download Button for ZIP
+                st.download_button(
+                    label="📦 Download All Documents (ZIP)",
+                    data=zip_buffer.getvalue(),
+                    file_name=f"{clean_client_name}_Documents.zip",
+                    mime="application/zip",
+                    type="primary"
+                )
+
+                st.markdown("---")
+                st.subheader("📥 Individual File Downloads")
+
+                col_d1, col_d2, col_d3 = st.columns(3)
+
+                with col_d1:
+                    st.write("**1. Subscription Agreement**")
+                    if sub_pdf:
+                        st.download_button("Download PDF", sub_pdf, f"{fn_sub_base}.pdf", "application/pdf")
+                    st.download_button("Download DOCX", sub_docx, f"{fn_sub_base}.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+
+                with col_d2:
+                    st.write("**2. Deed of Adherence**")
+                    if deed_pdf:
+                        st.download_button("Download PDF", deed_pdf, f"{fn_deed_base}.pdf", "application/pdf")
+                    st.download_button("Download DOCX", deed_docx, f"{fn_deed_base}.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+
+                with col_d3:
+                    st.write("**3. Declaration Form**")
+                    if decl_pdf:
+                        st.download_button("Download PDF", decl_pdf, f"{fn_decl_base}.pdf", "application/pdf")
+                    st.download_button("Download DOCX", decl_docx, f"{fn_decl_base}.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+
+            except Exception as e:
+                st.error(f"Error processing Google Docs: {e}")
