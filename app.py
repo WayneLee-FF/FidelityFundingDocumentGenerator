@@ -280,8 +280,9 @@ if submit_button:
         with st.spinner("Fetching templates and generating PDFs..."):
             
             # --- Text Formatting Rules ---
-            # 1. Client Name: ALWAYS ALL UPPER CASE
+            # 1. Names: ALWAYS ALL UPPER CASE
             formatted_client_name = client_name.strip().upper()
+            formatted_witness_name = witness_name.strip().upper()
 
             # 2. Address & Occupation: ALWAYS Title Case
             formatted_client_address = client_address.strip().title() if client_address.strip() else ""
@@ -299,6 +300,23 @@ if submit_button:
                     formatted_investment_amt = investment_amt
             else:
                 formatted_investment_amt = ""
+
+            # 5. Nominee Formats (Names -> UPPERCASE, Relationship & Address -> Title Case)
+            formatted_nom_data = {}
+            for i in range(1, 5):
+                n_name = nom_data.get(f"<<NOM{i}_NAME>>", "").strip()
+                n_nric = nom_data.get(f"<<NOM{i}_NRIC>>", "").strip()
+                n_rel  = nom_data.get(f"<<NOM{i}_RELATIONSHIP>>", "").strip()
+                n_addr = nom_data.get(f"<<NOM{i}_ADDRESS>>", "").strip()
+                n_email = nom_data.get(f"<<NOM{i}_EMAIL>>", "").strip()
+                n_pct  = nom_data.get(f"<<NOM{i}_PERCENTAGE>>", "").strip()
+
+                formatted_nom_data[f"<<NOM{i}_NAME>>"] = n_name.upper() if n_name else ""
+                formatted_nom_data[f"<<NOM{i}_NRIC>>"] = n_nric
+                formatted_nom_data[f"<<NOM{i}_RELATIONSHIP>>"] = n_rel.title() if n_rel else ""
+                formatted_nom_data[f"<<NOM{i}_ADDRESS>>"] = n_addr.title() if n_addr else ""
+                formatted_nom_data[f"<<NOM{i}_EMAIL>>"] = n_email
+                formatted_nom_data[f"<<NOM{i}_PERCENTAGE>>"] = n_pct
 
             rps_sub_url = TEMPLATE_CONFIG["RPS_CLASSES"][selected_rps]["doc_url"]
 
@@ -318,10 +336,10 @@ if submit_button:
                 "<<BANK_NAME>>": bank_name,
                 "<<BANK_ACC_NAME>>": bank_acc_name,
                 "<<BANK_ACC_NO>>": bank_acc_no,
-                "<<WITNESS_NAME>>": witness_name,
+                "<<WITNESS_NAME>>": formatted_witness_name,
                 "<<WITNESS_NRIC>>": witness_nric,
                 "<<RPS-CLASS>>": TEMPLATE_CONFIG["RPS_CLASSES"][selected_rps]["class_code"],
-                **nom_data
+                **formatted_nom_data
             }
 
             # Replace blank fields with two spaces "  "
