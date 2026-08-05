@@ -3,5 +3,4 @@ starlette<0.38.0
 python-docx>=1.1.0
 requests>=2.31.0
 gspread>=5.10.0
-google-auth>=2.20.0
-google-api-python-client>=2.100.0
+
