@@ -11,7 +11,7 @@ import streamlit.components.v1 as components
 from docx import Document
 
 # ==========================================
-# PAGE CONFIGURATION
+# PAGE CONFIGURATION & CSS CUSTOMIZATION
 # ==========================================
 st.set_page_config(
     page_title="Document Generator | Fidelity Funding",
@@ -19,7 +19,16 @@ st.set_page_config(
     layout="wide"
 )
 
-# Injected directly into the parent window's head to prevent 'Enter' key from submitting forms
+# Hide Streamlit's "Press Enter to submit" helper text in form inputs
+st.markdown("""
+    <style>
+    div[data-testid="InputInstructions"] {
+        display: none !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# Injected directly into the parent window's head to prevent 'Enter' keypress from submitting forms
 components.html("""
     <script>
     const parentDoc = window.parent.document;
@@ -29,13 +38,12 @@ components.html("""
         script.type = 'text/javascript';
         script.innerHTML = `
             document.addEventListener('keydown', function(e) {
-                // Target standard input fields and intercept the Enter key
                 if ((e.key === 'Enter' || e.keyCode === 13) && e.target.tagName === 'INPUT') {
                     e.preventDefault();
                     e.stopPropagation();
-                    e.stopImmediatePropagation(); // Crucial for overriding React's synthetic events
+                    e.stopImmediatePropagation();
                 }
-            }, true); // 'true' means capture phase, catching it before React does
+            }, true);
         `;
         parentDoc.head.appendChild(script);
     }
@@ -43,21 +51,31 @@ components.html("""
 """, height=0, width=0)
 
 # ==========================================
-# EASY CONFIGURATION / LINK MANAGEMENT
+# STREAMLIT SECRETS / LINK CONFIGURATION
 # ==========================================
+# Safely fetch template links from Streamlit Secrets (st.secrets) with fallback defaults
+def get_secret_link(key: str, default_url: str) -> str:
+    try:
+        return st.secrets["templates"].get(key, default_url)
+    except Exception:
+        return default_url
+
+RPS_Y_URL = get_secret_link("rps_y_url", "https://docs.google.com/document/d/1u5_-1qhJOk_6HfRILFRLTBAxL3UmE-p1/")
+RPS_Z_URL = get_secret_link("rps_z_url", "https://docs.google.com/document/d/1u5_-1qhJOk_6HfRILFRLTBAxL3UmE-p1/")
+DEED_URL = get_secret_link("deed_url", "https://docs.google.com/document/d/1WhyRxt6nOaReWplabFUVUXgfgZI_zWtS/")
+DECL_URL = get_secret_link("decl_url", "https://docs.google.com/document/d/1NBmaPDk5RwJZArVO4OUxWDI33q8Ox_U4/")
+
 TEMPLATE_CONFIG = {
     "RPS_CLASSES": {
         "RPS-Y | 1yr | 10.0%": {
             "class_code": "RPS-Y",
-            "doc_url": "https://docs.google.com/document/d/1u5_-1qhJOk_6HfRILFRLTBAxL3UmE-p1/"
+            "doc_url": RPS_Y_URL
         },
         "RPS-Z | 1yr | 6.0%": {
             "class_code": "RPS-Z",
-            "doc_url": "https://docs.google.com/document/d/1u5_-1qhJOk_6HfRILFRLTBAxL3UmE-p1/"
+            "doc_url": RPS_Z_URL
         }
-    },
-    "DEED_OF_ADHERENCE": "https://docs.google.com/document/d/1WhyRxt6nOaReWplabFUVUXgfgZI_zWtS/",
-    "DECLARATION_FORM": "https://docs.google.com/document/d/1NBmaPDk5RwJZArVO4OUxWDI33q8Ox_U4/"
+    }
 }
 
 # ==========================================
@@ -81,12 +99,10 @@ def replace_placeholders_in_paragraph(paragraph, replacements: dict):
     """Replace placeholder keys in paragraph while preserving text runs."""
     for key, value in replacements.items():
         if key in paragraph.text:
-            # Replace at individual run level if key is contained in a single run
             for run in paragraph.runs:
                 if key in run.text:
                     run.text = run.text.replace(key, value)
             
-            # If key spans across multiple runs, replace across paragraph text
             if key in paragraph.text:
                 full_text = paragraph.text.replace(key, value)
                 for i, run in enumerate(paragraph.runs):
@@ -100,11 +116,9 @@ def process_docx_bytes(file_bytes: bytes, replacements: dict) -> bytes:
     doc_io = io.BytesIO(file_bytes)
     doc = Document(doc_io)
 
-    # Process all paragraphs
     for p in doc.paragraphs:
         replace_placeholders_in_paragraph(p, replacements)
 
-    # Process all table cells
     for table in doc.tables:
         for row in table.rows:
             for cell in row.cells:
@@ -147,16 +161,6 @@ def convert_docx_to_pdf(docx_bytes: bytes) -> bytes:
 st.title("📄 PDF & Document Generator")
 st.markdown("Automated generation of **Subscription Agreements**, **Deed of Adherence**, and **Declaration Forms**.")
 
-# Sidebar for Config Management
-with st.sidebar:
-    st.header("⚙️ Template Link Management")
-    st.info("You can quickly update Google Doc template links below if needed.")
-    
-    selected_rps = st.selectbox("Select RPS Class", list(TEMPLATE_CONFIG["RPS_CLASSES"].keys()))
-    rps_sub_url = st.text_input("Subscription Agreement Link", TEMPLATE_CONFIG["RPS_CLASSES"][selected_rps]["doc_url"])
-    deed_url = st.text_input("Deed of Adherence Link", TEMPLATE_CONFIG["DEED_OF_ADHERENCE"])
-    decl_url = st.text_input("Declaration Form Link", TEMPLATE_CONFIG["DECLARATION_FORM"])
-
 # Main Input Form
 with st.form("doc_generation_form"):
     st.subheader("1. Client & Investment Details")
@@ -170,6 +174,7 @@ with st.form("doc_generation_form"):
         client_address = st.text_area("Correspondence Address", value="")
         
     with col2:
+        selected_rps = st.selectbox("Select RPS Class", list(TEMPLATE_CONFIG["RPS_CLASSES"].keys()))
         client_dob = st.text_input("Date of Birth", value="")
         client_nationality = st.text_input("Nationality", value="")
         client_occupation = st.text_input("Occupation", value="")
@@ -258,6 +263,7 @@ if submit_button:
     else:
         with st.spinner("Fetching templates and generating PDFs..."):
             formatted_date = agreement_date.strftime("%d/%m/%Y")
+            rps_sub_url = TEMPLATE_CONFIG["RPS_CLASSES"][selected_rps]["doc_url"]
 
             # Map input fields to placeholders
             raw_replacements = {
@@ -281,7 +287,7 @@ if submit_button:
                 **nom_data
             }
 
-            # If any field is left blank, replace placeholder with two spaces "  "
+            # Replace blank fields with two spaces "  "
             replacements = {k: (v.strip() if v and str(v).strip() else "  ") for k, v in raw_replacements.items()}
 
             clean_client_name = client_name.strip()
@@ -296,8 +302,8 @@ if submit_button:
             try:
                 # 1. Fetch Google Doc templates
                 sub_docx_raw = fetch_google_doc_bytes(rps_sub_url)
-                deed_docx_raw = fetch_google_doc_bytes(deed_url)
-                decl_docx_raw = fetch_google_doc_bytes(decl_url)
+                deed_docx_raw = fetch_google_doc_bytes(DEED_URL)
+                decl_docx_raw = fetch_google_doc_bytes(DECL_URL)
 
                 # 2. Populate placeholders
                 sub_docx = process_docx_bytes(sub_docx_raw, replacements)
@@ -318,7 +324,6 @@ if submit_button:
                         zip_file.writestr(f"{fn_sub_base}.pdf", sub_pdf)
                         zip_file.writestr(f"{fn_deed_base}.pdf", deed_pdf)
                         zip_file.writestr(f"{fn_decl_base}.pdf", decl_pdf)
-                    # Add DOCX versions as well
                     zip_file.writestr(f"{fn_sub_base}.docx", sub_docx)
                     zip_file.writestr(f"{fn_deed_base}.docx", deed_docx)
                     zip_file.writestr(f"{fn_decl_base}.docx", decl_docx)
