@@ -157,7 +157,7 @@ def convert_docx_to_pdf(docx_bytes: bytes) -> bytes:
 # USER INTERFACE
 # ==========================================
 
-st.title("📄 PDF & Document Generator")
+st.title("Fidelity Funding RPS Subscription Document Generator")
 st.markdown("Automated generation of **Subscription Agreements**, **Deed of Adherence**, and **Declaration Forms**.")
 
 # Main Input Form
@@ -214,7 +214,7 @@ with st.form("doc_generation_form"):
                 nom_data[f"<<NOM{i}_EMAIL>>"] = st.text_input(f"Nominee {i} Email", key=f"n_email_{i}")
                 nom_data[f"<<NOM{i}_PERCENTAGE>>"] = st.text_input(f"Nominee {i} Percentage (%)", key=f"n_pct_{i}")
 
-    submit_button = st.form_submit_button("🔨 Generate Documents & PDF")
+    submit_button = st.form_submit_button("Generate Documents & PDF")
 
 # ==========================================
 # VALIDATION & PROCESSING
@@ -238,12 +238,22 @@ if submit_button:
     if clean_inv_amt and not re.match(r"^\d+(\.\d+)?$", clean_inv_amt):
         errors.append("Investment Amount must contain numbers only.")
 
-    # 4. Nominee Percentage Validation & 100% Sum Check
+    # 4. Nominee Validation Logic
     total_pct = 0.0
     pct_has_error = False
 
     for i in range(1, 5):
+        n_name = nom_data.get(f"<<NOM{i}_NAME>>", "").strip()
+        n_nric = nom_data.get(f"<<NOM{i}_NRIC>>", "").strip()
+        n_rel  = nom_data.get(f"<<NOM{i}_RELATIONSHIP>>", "").strip()
+        n_addr = nom_data.get(f"<<NOM{i}_ADDRESS>>", "").strip()
+        n_email = nom_data.get(f"<<NOM{i}_EMAIL>>", "").strip()
         pct_val_str = nom_data.get(f"<<NOM{i}_PERCENTAGE>>", "").strip()
+
+        # Check if ANY field for this nominee has been filled
+        is_nominee_filled = any([n_name, n_nric, n_rel, n_addr, n_email, pct_val_str])
+        
+        pct_val = 0.0
         if pct_val_str:
             try:
                 pct_val = float(pct_val_str)
@@ -252,8 +262,15 @@ if submit_button:
                 errors.append(f"Nominee {i} Percentage must be a valid number.")
                 pct_has_error = True
 
-    if not pct_has_error and abs(total_pct - 100.0) > 0.001:
-        errors.append(f"The sum of all 4 nominee percentages must equal 100%. (Current total: {total_pct:.2f}%)")
+        # Rule: If any field is filled, percentage must be > 0
+        if is_nominee_filled and pct_val <= 0:
+            errors.append(f"Nominee {i} details are filled out, so Nominee {i} Percentage must be greater than 0%.")
+            pct_has_error = True
+
+    # Rule: Total nominee percentage must equal 100% OR 0%
+    if not pct_has_error:
+        if abs(total_pct - 100.0) > 0.001 and abs(total_pct - 0.0) > 0.001:
+            errors.append(f"The sum of all nominee percentages must equal 100% or 0%. (Current total: {total_pct:.2f}%)")
 
     # Display Errors or Proceed
     if errors:
