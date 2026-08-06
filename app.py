@@ -294,7 +294,12 @@ if submit_button:
     if clean_inv_amt and not re.match(r"^\d+(\.\d+)?$", clean_inv_amt):
         errors.append("Investment Amount must contain numbers only.")
 
-    # 4. Nominee Validation Logic
+    # 4. Bank Account Number Validation (Numbers only)
+    clean_bank_acc = bank_acc_no.strip().replace("-", "").replace(" ", "")
+    if clean_bank_acc and not clean_bank_acc.isdigit():
+        errors.append("Bank Account Number must contain numbers only.")
+
+    # 5. Nominee Validation Logic
     total_pct = 0.0
     pct_has_error = False
 
