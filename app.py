@@ -59,21 +59,54 @@ def get_secret_link(key: str, default_url: str) -> str:
     except Exception:
         return default_url
 
-RPS_Y_URL = get_secret_link("rps_y_url", "https://docs.google.com/document/d/1u5_-1qhJOk_6HfRILFRLTBAxL3UmE-p1/")
-RPS_Z_URL = get_secret_link("rps_z_url", "https://docs.google.com/document/d/1u5_-1qhJOk_6HfRILFRLTBAxL3UmE-p1/")
+# Standard / Base Documents
 DEED_URL = get_secret_link("deed_url", "https://docs.google.com/document/d/1WhyRxt6nOaReWplabFUVUXgfgZI_zWtS/")
 DECL_URL = get_secret_link("decl_url", "https://docs.google.com/document/d/1NBmaPDk5RwJZArVO4OUxWDI33q8Ox_U4/")
 
+# RPS Class URLs
+RPS_L_URL = get_secret_link("rps_l_url", "https://docs.google.com/document/d/1JVmW9o_8BWcfjsurqeVEnXxr71Jj-sx3/")
+RPS_N_URL = get_secret_link("rps_n_url", "https://docs.google.com/document/d/1qMcFU853zV-z4vAS6zxfHh8-hofj7q-T/")
+RPS_S_URL = get_secret_link("rps_s_url", "https://docs.google.com/document/d/18xjhuBSyKFMPuL9nOcTnkrysmDb91G7k/")
+RPS_M_URL = get_secret_link("rps_m_url", "https://docs.google.com/document/d/1rHLUYq_6ha-MS4uqp-tUGAUd4X3JbnoR/")
+RPS_O_URL = get_secret_link("rps_o_url", "https://docs.google.com/document/d/1XxNsZG_WLbmzkwCMFUif-fdFVEkPQZZr/")
+RPS_T_URL = get_secret_link("rps_t_url", "https://docs.google.com/document/d/1VfSp_L-kyp8W6VNin-XFxwWOtqSMEnBb/")
+RPS_F_URL = get_secret_link("rps_f_url", "https://docs.google.com/document/d/1Nqd-uYKIAn5vgNU8bEgI8eNUMBLuP1I7/")
+RPS_P_URL = get_secret_link("rps_p_url", "https://docs.google.com/document/d/1qoU402q6KzPPUKeAzuU6Z413rYUEf-DB/")
+RPS_U_URL = get_secret_link("rps_u_url", "https://docs.google.com/document/d/194KFp9RRV1qSUynNEA-PBUKVTeQqmsKZ/")
+RPS_G_URL = get_secret_link("rps_g_url", "https://docs.google.com/document/d/1L6U1GwJTKqGL2ppAlrXofkeuZ8pJi35E/")
+RPS_Q_URL = get_secret_link("rps_q_url", "https://docs.google.com/document/d/1feV2q9f0xmcsyEJpBtV1-9R2I02QJlNc/")
+RPS_W_URL = get_secret_link("rps_w_url", "https://docs.google.com/document/d/1zsr_hApx3x54OP_V5qr99R-9dZGsvRrG/")
+RPS_H_URL = get_secret_link("rps_h_url", "https://docs.google.com/document/d/1v7-2B01ziMgwq49bNHkeMkzElNuGsgAb/")
+RPS_R_URL = get_secret_link("rps_r_url", "https://docs.google.com/document/d/12pOqGbpgUdProe9dDFn28mMCjOu6QmZq/")
+RPS_X_URL = get_secret_link("rps_x_url", "https://docs.google.com/document/d/1NNmI8Cw877dZ2qTqBJVl3bIyQofxeGA9/")
+RPS_AA_URL = get_secret_link("rps_aa_url", "https://docs.google.com/document/d/1KTrPpccaQRgnrA_4_Eo3HueDAgc42dt5/")
+RPS_Z_URL = get_secret_link("rps_z_url", "https://docs.google.com/document/d/16y8qvcIfBvyhwZgbec5CsAR-S-chK4-g/")
+RPS_K_URL = get_secret_link("rps_k_url", "https://docs.google.com/document/d/19KnGODh6xvTwSIQiedHHCZJYwUIwCRQq/")
+RPS_Y_URL = get_secret_link("rps_y_url", "https://docs.google.com/document/d/1u5_-1qhJOk_6HfRILFRLTBAxL3UmE-p1/")
+RPS_V_URL = get_secret_link("rps_v_url", "https://docs.google.com/document/d/1C4Ku6COeTT16yhicQAUjQQRKF2NkAenk/")
+
 TEMPLATE_CONFIG = {
     "RPS_CLASSES": {
-        "RPS-Y | 1yr | 10.0%": {
-            "class_code": "RPS-Y",
-            "doc_url": RPS_Y_URL
-        },
-        "RPS-Z | 1yr | 6.0%": {
-            "class_code": "RPS-Z",
-            "doc_url": RPS_Z_URL
-        }
+        "RPS-L | 30k | 1yr | 9.0%": {"class_code": "RPS-L", "doc_url": RPS_L_URL},
+        "RPS-N | 30k | 2yr | 9.5%": {"class_code": "RPS-N", "doc_url": RPS_N_URL},
+        "RPS-S | 30k | 3yr | 10.0%": {"class_code": "RPS-S", "doc_url": RPS_S_URL},
+        "RPS-M | 50k | 1yr | 10.0%": {"class_code": "RPS-M", "doc_url": RPS_M_URL},
+        "RPS-O | 50k | 2yr | 10.5%": {"class_code": "RPS-O", "doc_url": RPS_O_URL},
+        "RPS-T | 50k | 3yr | 11.0%": {"class_code": "RPS-T", "doc_url": RPS_T_URL},
+        "RPS-F | 100k | 1yr | 11.0%": {"class_code": "RPS-F", "doc_url": RPS_F_URL},
+        "RPS-P | 100k | 2yr | 11.5%": {"class_code": "RPS-P", "doc_url": RPS_P_URL},
+        "RPS-U | 100k | 3yr | 12.0%": {"class_code": "RPS-U", "doc_url": RPS_U_URL},
+        "RPS-G | 250k | 1yr | 11.0%": {"class_code": "RPS-G", "doc_url": RPS_G_URL},
+        "RPS-Q | 250k | 2yr | 12.0%": {"class_code": "RPS-Q", "doc_url": RPS_Q_URL},
+        "RPS-W | 250k | 3yr | 12.5%": {"class_code": "RPS-W", "doc_url": RPS_W_URL},
+        "RPS-H | 500k | 1yr | 12.0%": {"class_code": "RPS-H", "doc_url": RPS_H_URL},
+        "RPS-R | 500k | 2yr | 12.5%": {"class_code": "RPS-R", "doc_url": RPS_R_URL},
+        "RPS-X | 500k | 3yr | 13.0%": {"class_code": "RPS-X", "doc_url": RPS_X_URL},
+        "RPS-AA | Profit Sharing": {"class_code": "RPS-AA", "doc_url": RPS_AA_URL},
+        "RPS-Z | 1yr | 6.0% | Semi-Annually": {"class_code": "RPS-Z", "doc_url": RPS_Z_URL},
+        "RPS-K | 1yr | 9.0% | Monthly": {"class_code": "RPS-K", "doc_url": RPS_K_URL},
+        "RPS-Y | 1yr | 10.0% | Monthly": {"class_code": "RPS-Y", "doc_url": RPS_Y_URL},
+        "RPS-V | 1yr | 15.0% | Monthly": {"class_code": "RPS-V", "doc_url": RPS_V_URL}
     }
 }
 
@@ -362,7 +395,7 @@ if submit_button:
             rps_code = TEMPLATE_CONFIG["RPS_CLASSES"][selected_rps]["class_code"]
 
             # Output File Naming Patterns (Added brackets)
-            fn_sub_base = f"[{clean_file_client_name}] 1. FF {rps_code} SubscriptionAgreement {clean_file_date}"
+            fn_sub_base = f"[{clean_file_client_name}] 1. FF {rps_code} Subscription Agreement {clean_file_date}"
             fn_deed_base = f"[{clean_file_client_name}] 2. FF Deed of Adherence {clean_file_date}"
             fn_decl_base = f"[{clean_file_client_name}] 3. FF Declaration Form (Sophisticated Investor)"
 
