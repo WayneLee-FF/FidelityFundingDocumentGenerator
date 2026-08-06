@@ -13,6 +13,26 @@ from docx import Document
 # ==========================================
 # PAGE CONFIGURATION & CSS CUSTOMIZATION
 # ==========================================
+hide_streamlit_style = """
+    <style>
+    /* Hides the top-right menu and GitHub icon */
+    [data-testid="stToolbar"] {
+        visibility: hidden !important;
+    }
+    
+    /* Hides any anchor tag pointing to GitHub */
+    a[href^="https://github.com"] {
+        display: none !important;
+    }
+    
+    /* Hides the Streamlit footer ("Made with Streamlit") */
+    footer {
+        visibility: hidden !important;
+    }
+    </style>
+"""
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
 st.set_page_config(
     page_title="Document Generator | Fidelity Funding",
     page_icon="📄",
