@@ -351,9 +351,12 @@ if submit_button:
             
             # --- Text Formatting Rules ---
             formatted_client_name = client_name.strip().upper()
+            formatted_client_nric = client_nric.strip().upper()
             formatted_witness_name = witness_name.strip().upper()
+            formatted_witness_nric = witness_nric.strip().upper()
             formatted_client_address = client_address.strip().title() if client_address.strip() else ""
             formatted_client_occupation = client_occupation.strip().title() if client_occupation.strip() else ""
+            formatted_client_nationality = client_nationality.strip().title() if client_nationality.strip() else ""
             formatted_agreement_date = agreement_date.strftime("%d %b %Y")
             formatted_client_dob = client_dob.strftime("%d %b %Y") if client_dob else ""
 
@@ -375,7 +378,7 @@ if submit_button:
                 n_pct  = nom_data.get(f"<<NOM{i}_PERCENTAGE>>", "").strip()
 
                 formatted_nom_data[f"<<NOM{i}_NAME>>"] = n_name.upper() if n_name else ""
-                formatted_nom_data[f"<<NOM{i}_NRIC>>"] = n_nric
+                formatted_nom_data[f"<<NOM{i}_NRIC>>"] = n_nric.upper() if n_nric else ""
                 formatted_nom_data[f"<<NOM{i}_RELATIONSHIP>>"] = n_rel.title() if n_rel else ""
                 formatted_nom_data[f"<<NOM{i}_ADDRESS>>"] = n_addr.title() if n_addr else ""
                 formatted_nom_data[f"<<NOM{i}_EMAIL>>"] = n_email
@@ -385,12 +388,12 @@ if submit_button:
 
             raw_replacements = {
                 "<<CLIENT_NAME>>": formatted_client_name,
-                "<<CLIENT_NRIC>>": client_nric,
+                "<<CLIENT_NRIC>>": formatted_client_nric,
                 "<<CLIENT_EMAIL>>": client_email,
                 "<<CLIENT_CONTACT>>": client_contact,
                 "<<CLIENT_ADDRESS>>": formatted_client_address,
                 "<<CLIENT_DOB>>": formatted_client_dob,
-                "<<CLIENT_NATIONALITY>>": client_nationality,
+                "<<CLIENT_NATIONALITY>>": formatted_client_nationality,
                 "<<CLIENT_OCCUPATION>>": formatted_client_occupation,
                 "<<INVESTMENT_AMT>>": formatted_investment_amt,
                 "<<DATE>>": formatted_agreement_date,
@@ -399,14 +402,14 @@ if submit_button:
                 "<<BANK_ACC_NAME>>": bank_acc_name,
                 "<<BANK_ACC_NO>>": bank_acc_no,
                 "<<WITNESS_NAME>>": formatted_witness_name,
-                "<<WITNESS_NRIC>>": witness_nric,
+                "<<WITNESS_NRIC>>": formatted_witness_nric,
                 "<<RPS-CLASS>>": TEMPLATE_CONFIG["RPS_CLASSES"][selected_rps]["class_code"],
                 **formatted_nom_data
             }
 
             replacements = {k: (v.strip() if v and str(v).strip() else "  ") for k, v in raw_replacements.items()}
 
-            clean_file_client_name = client_name.strip()
+            clean_file_client_name = client_name.strip().upper()
             clean_file_date = agreement_date.strftime("%Y%m%d")
             rps_code = TEMPLATE_CONFIG["RPS_CLASSES"][selected_rps]["class_code"]
 
