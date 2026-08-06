@@ -72,7 +72,7 @@ def get_secret_link(key: str) -> str:
 DEED_URL = get_secret_link("deed_url")
 DECL_URL = get_secret_link("decl_url")
 
-# RPS Class URLs fetched purely from Secrets
+# RPS Class URLs
 TEMPLATE_CONFIG = {
     "RPS_CLASSES": {
         "RPS-L | 30k | 1yr | 9.0%": {"class_code": "RPS-L", "doc_url": get_secret_link("rps_l_url")},
@@ -94,7 +94,8 @@ TEMPLATE_CONFIG = {
         "RPS-Z | 1yr | 6.0% | Semi-Annually": {"class_code": "RPS-Z", "doc_url": get_secret_link("rps_z_url")},
         "RPS-K | 1yr | 9.0% | Monthly": {"class_code": "RPS-K", "doc_url": get_secret_link("rps_k_url")},
         "RPS-Y | 1yr | 10.0% | Monthly": {"class_code": "RPS-Y", "doc_url": get_secret_link("rps_y_url")},
-        "RPS-V | 1yr | 15.0% | Monthly": {"class_code": "RPS-V", "doc_url": get_secret_link("rps_v_url")}
+        "RPS-V | 1yr | 15.0% | Monthly": {"class_code": "RPS-V", "doc_url": get_secret_link("rps_v_url")},
+        "RPS-V | 1yr | 15.0% | Monthly (DIRECT)": {"class_code": "RPS-V (DIRECT)", "doc_url": "https://docs.google.com/document/d/1KsdlheVf7UZSZEx5W0iP2vTRlpz3t98d/"}
     }
 }
 
@@ -193,7 +194,7 @@ def convert_docx_to_pdf(docx_bytes: bytes) -> bytes:
 # USER TIERING / ACCESS CONTROL
 # ==========================================
 
-RESTRICTED_CLASSES = ["RPS-Z", "RPS-K", "RPS-Y", "RPS-V"]
+RESTRICTED_CLASSES = ["RPS-Z", "RPS-K", "RPS-Y", "RPS-V", "RPS-V (DIRECT)"]
 
 # Filter available options based on login status
 available_rps_options = []
@@ -359,6 +360,8 @@ if submit_button:
             formatted_client_nationality = client_nationality.strip().title() if client_nationality.strip() else ""
             formatted_agreement_date = agreement_date.strftime("%d %b %Y")
             formatted_client_dob = client_dob.strftime("%d %b %Y") if client_dob else ""
+            formatted_bank_name = bank_name.strip().upper()
+            formatted_bank_acc_name = bank_acc_name.strip().title()
 
             if clean_inv_amt:
                 try:
@@ -398,8 +401,8 @@ if submit_button:
                 "<<INVESTMENT_AMT>>": formatted_investment_amt,
                 "<<DATE>>": formatted_agreement_date,
                 "<<STAMPING>>": stamping,
-                "<<BANK_NAME>>": bank_name,
-                "<<BANK_ACC_NAME>>": bank_acc_name,
+                "<<BANK_NAME>>": formatted_bank_name,
+                "<<BANK_ACC_NAME>>": formatted_bank_acc_name,
                 "<<BANK_ACC_NO>>": bank_acc_no,
                 "<<WITNESS_NAME>>": formatted_witness_name,
                 "<<WITNESS_NRIC>>": formatted_witness_nric,
@@ -417,31 +420,39 @@ if submit_button:
             fn_deed_base = f"[{clean_file_client_name}] 2. FF Deed of Adherence {clean_file_date}"
             fn_decl_base = f"[{clean_file_client_name}] 3. FF Declaration Form (Sophisticated Investor)"
 
+            # Flag to bypass the Deed of Adherence for RPS-V (DIRECT)
+            is_direct_class = selected_rps == "RPS-V | 1yr | 15.0% | Monthly (DIRECT)"
+
             try:
-                # 1. Fetch Google Doc templates
+                # 1. Fetch Google Doc templates (skip DEED_URL if Direct Class)
                 sub_docx_raw = fetch_google_doc_bytes(rps_sub_url)
-                deed_docx_raw = fetch_google_doc_bytes(DEED_URL)
                 decl_docx_raw = fetch_google_doc_bytes(DECL_URL)
 
                 # 2. Populate placeholders
                 sub_docx = process_docx_bytes(sub_docx_raw, replacements)
-                deed_docx = process_docx_bytes(deed_docx_raw, replacements)
                 decl_docx = process_docx_bytes(decl_docx_raw, replacements)
 
                 # 3. Convert to PDF
                 sub_pdf = convert_docx_to_pdf(sub_docx)
-                deed_pdf = convert_docx_to_pdf(deed_docx)
                 decl_pdf = convert_docx_to_pdf(decl_docx)
+                
+                # Conditionally handle Deed of Adherence
+                deed_pdf = None
+                if not is_direct_class:
+                    deed_docx_raw = fetch_google_doc_bytes(DEED_URL)
+                    deed_docx = process_docx_bytes(deed_docx_raw, replacements)
+                    deed_pdf = convert_docx_to_pdf(deed_docx)
 
                 st.success("✅ PDF Documents generated successfully!")
 
                 # Prepare ZIP download package (PDFs ONLY)
                 zip_buffer = io.BytesIO()
                 with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-                    if sub_pdf:
+                    if sub_pdf and decl_pdf:
                         zip_file.writestr(f"{fn_sub_base}.pdf", sub_pdf)
-                        zip_file.writestr(f"{fn_deed_base}.pdf", deed_pdf)
                         zip_file.writestr(f"{fn_decl_base}.pdf", decl_pdf)
+                        if deed_pdf and not is_direct_class:
+                            zip_file.writestr(f"{fn_deed_base}.pdf", deed_pdf)
                     else:
                         st.error("Failed to generate PDFs. Please check system dependencies.")
 
@@ -465,12 +476,16 @@ if submit_button:
                         st.download_button("Download PDF", sub_pdf, f"{fn_sub_base}.pdf", "application/pdf")
 
                 with col_d2:
-                    st.write("**2. Deed of Adherence**")
-                    if deed_pdf:
-                        st.download_button("Download PDF", deed_pdf, f"{fn_deed_base}.pdf", "application/pdf")
+                    if not is_direct_class:
+                        st.write("**2. Deed of Adherence**")
+                        if deed_pdf:
+                            st.download_button("Download PDF", deed_pdf, f"{fn_deed_base}.pdf", "application/pdf")
 
                 with col_d3:
-                    st.write("**3. Declaration Form**")
+                    if is_direct_class:
+                        st.write("**2. Declaration Form**")
+                    else:
+                        st.write("**3. Declaration Form**")
                     if decl_pdf:
                         st.download_button("Download PDF", decl_pdf, f"{fn_decl_base}.pdf", "application/pdf")
 
@@ -482,7 +497,7 @@ if submit_button:
 # ==========================================
 st.markdown("<br><br><br>", unsafe_allow_html=True)
 st.markdown("---")
-with st.expander("🔐 Admin Login (Tier 1 Access)", expanded=False):
+with st.expander("🔐 Admin Login", expanded=False):
     if not st.session_state.logged_in:
         # We use a form here to capture Enter key presses naturally for the login 
         with st.form("login_form"):
