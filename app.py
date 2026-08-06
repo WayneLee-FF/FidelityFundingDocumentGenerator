@@ -289,17 +289,22 @@ if submit_button:
     if client_email.strip() and not re.match(email_regex, client_email.strip()):
         errors.append("Invalid Client Email format.")
 
-    # 3. Investment Amount Validation (Numbers only)
+    # 3. Contact Number Validation
+    clean_contact = re.sub(r"[\s\-\(\)]", "", client_contact.strip())
+    if clean_contact and not re.match(r"^\+?\d{7,15}$", clean_contact):
+        errors.append("Invalid Contact Number format. Please enter a valid number (e.g., +60123456789).")
+
+    # 4. Investment Amount Validation (Numbers only)
     clean_inv_amt = investment_amt.strip().replace(",", "")
     if clean_inv_amt and not re.match(r"^\d+(\.\d+)?$", clean_inv_amt):
         errors.append("Investment Amount must contain numbers only.")
 
-    # 4. Bank Account Number Validation (Numbers only)
+    # 5. Bank Account Number Validation (Numbers only)
     clean_bank_acc = bank_acc_no.strip().replace("-", "").replace(" ", "")
     if clean_bank_acc and not clean_bank_acc.isdigit():
         errors.append("Bank Account Number must contain numbers only.")
 
-    # 5. Nominee Validation Logic
+    # 6. Nominee Validation Logic
     total_pct = 0.0
     pct_has_error = False
 
