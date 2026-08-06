@@ -19,6 +19,10 @@ st.set_page_config(
     layout="wide"
 )
 
+# Initialize Login State
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+
 # Hide Streamlit's "Press Enter to submit" helper text in form inputs
 st.markdown("""
     <style>
@@ -186,6 +190,22 @@ def convert_docx_to_pdf(docx_bytes: bytes) -> bytes:
     return None
 
 # ==========================================
+# USER TIERING / ACCESS CONTROL
+# ==========================================
+
+RESTRICTED_CLASSES = ["RPS-Z", "RPS-K", "RPS-Y", "RPS-V"]
+
+# Filter available options based on login status
+available_rps_options = []
+for rps_name, rps_info in TEMPLATE_CONFIG["RPS_CLASSES"].items():
+    code = rps_info["class_code"]
+    # If not logged in, skip the restricted classes (Tier 2 behavior)
+    if not st.session_state.logged_in and code in RESTRICTED_CLASSES:
+        continue
+    available_rps_options.append(rps_name)
+
+
+# ==========================================
 # USER INTERFACE
 # ==========================================
 
@@ -205,7 +225,7 @@ with st.form("doc_generation_form"):
         client_address = st.text_area("Correspondence Address", value="")
         
     with col2:
-        selected_rps = st.selectbox("Select RPS Class", list(TEMPLATE_CONFIG["RPS_CLASSES"].keys()))
+        selected_rps = st.selectbox("Select RPS Class", available_rps_options)
         client_dob = st.date_input(
             "Date of Birth", 
             value=datetime.date(1990, 1, 1), 
@@ -380,7 +400,6 @@ if submit_button:
             clean_file_date = agreement_date.strftime("%Y%m%d")
             rps_code = TEMPLATE_CONFIG["RPS_CLASSES"][selected_rps]["class_code"]
 
-            # Output File Naming Patterns (Added brackets)
             fn_sub_base = f"[{clean_file_client_name}] 1. FF {rps_code} Subscription Agreement {clean_file_date}"
             fn_deed_base = f"[{clean_file_client_name}] 2. FF Deed of Adherence {clean_file_date}"
             fn_decl_base = f"[{clean_file_client_name}] 3. FF Declaration Form (Sophisticated Investor)"
@@ -444,3 +463,36 @@ if submit_button:
 
             except Exception as e:
                 st.error(f"Error processing Google Docs: {e}")
+
+# ==========================================
+# ADMIN LOGIN EXPANDER (BOTTOM OF APP)
+# ==========================================
+st.markdown("<br><br><br>", unsafe_allow_html=True)
+st.markdown("---")
+with st.expander("🔐 Admin Login (Tier 1 Access)", expanded=False):
+    if not st.session_state.logged_in:
+        # We use a form here to capture Enter key presses naturally for the login 
+        with st.form("login_form"):
+            username = st.text_input("Username")
+            password = st.text_input("Password", type="password")
+            login_submitted = st.form_submit_button("Login")
+            
+            if login_submitted:
+                try:
+                    secret_user = st.secrets["admin"]["username"]
+                    secret_pass = st.secrets["admin"]["password"]
+                except KeyError:
+                    st.error("Admin credentials are not correctly configured in secrets.toml.")
+                    secret_user, secret_pass = None, None
+                
+                if secret_user and secret_pass:
+                    if username == secret_user and password == secret_pass:
+                        st.session_state.logged_in = True
+                        st.rerun()
+                    else:
+                        st.error("Invalid credentials")
+    else:
+        st.success("You are currently logged in as an Administrator with full Tier 1 access.")
+        if st.button("Logout"):
+            st.session_state.logged_in = False
+            st.rerun()
