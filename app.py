@@ -19,6 +19,21 @@ st.set_page_config(
     layout="wide"
 )
 
+# Hide GitHub icon / viewer badge via CSS injection
+hide_github_badge = """
+    <style>
+    .viewerBadge_container__1QSob,
+    .styles_viewerBadge__1yB5_,
+    .viewerBadge_link__1S137,
+    .viewerBadge_text__1JaDK,
+    #GithubIcon {
+        visibility: hidden;
+        display: none !important;
+    }
+    </style>
+"""
+st.markdown(hide_github_badge, unsafe_allow_html=True)
+
 # Initialize Login State
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
